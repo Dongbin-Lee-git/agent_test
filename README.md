@@ -1,5 +1,3 @@
-# Upstage Gangwon Backend
-
 FastAPI backend with agenic functionality using Upstage Solar2 embeddings and ChromaDB vector database.
 
 ## Features
@@ -98,9 +96,3 @@ The system implements a Retrieval-Augmented Generation (RAG) pipeline:
 - **Upstage Solar2**: Embedding and language model
 - **FastAPI**: Web framework
 - **Docker**: Container orchestration
-
-## Tech Stack
-
-LangGraph, Solar Pro2, Solar Embedding, Chroma DB, 
-토큰량을 계산하기 위한 solar-pro-tokenzier (링크), 검색을 위한 Serper.dev 정도를 생각 중입니다.
-
