@@ -42,11 +42,14 @@ jobs:
           echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           echo "Generated version: ${VERSION_TAG}"
 
+      - name: Set image name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Build & Push
         run: |
           set -euo pipefail
 
-          IMAGE_NAME="ghcr.io/dongbin-lee-git/medical-qa"
           VERSION_TAG="${{ steps.version.outputs.version_tag }}"
 
           docker buildx build \
@@ -68,7 +71,7 @@ jobs:
 
             cd /home/ubuntu/deploy/medical-qa/infra/k8s/application
 
-            sed -i "s|image: ghcr.io/dongbin-lee-git/medical-qa:.*|image: ghcr.io/dongbin-lee-git/medical-qa:${VERSION_TAG}|g" 04-backend.yaml
+            sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${VERSION_TAG}|g" 04-backend.yaml
             sed -i "s|value: \".*\"|value: \"${VERSION_TAG}\"|g" 04-backend.yaml
 
             kubectl apply -f 04-backend.yaml

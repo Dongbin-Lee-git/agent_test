@@ -13,41 +13,31 @@ services:
     volumes:
       - ./chroma_data:/data
     networks:
-      - tobi-network
+      - medical-qa-network
     restart: unless-stopped
 
   backend:
-    image: tobi-backend:lite
-    container_name: backend
+    image: medical-qa-app:latest
+    container_name: medical-qa-app
     ports:
-      - "1234:80"
+      - "8001:8001"
+      - "8002:8002"
     environment:
       - UPSTAGE_API_KEY=${UPSTAGE_API_KEY}
       - SERPER_API_KEY=${SERPER_API_KEY}
       - CHROMA_MODE=server
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
+      - BACKEND_URL=http://localhost:8001
+      - SEED_URL=${SEED_URL:-https://drive.google.com/uc?id=1mHW0y_eAJYyt-vQLLysHNobXlCoOvJtB}
     depends_on:
       - chromadb
     networks:
-      - tobi-network
-    restart: unless-stopped
-
-  frontend:
-    image: tobi-frontend:lite
-    container_name: frontend
-    ports:
-      - "5678:81"
-    environment:
-      - BACKEND_URL=http://backend:80
-    depends_on:
-      - backend
-    networks:
-      - tobi-network
+      - medical-qa-network
     restart: unless-stopped
 
 networks:
-  tobi-network:
+  medical-qa-network:
     driver: bridge
 
 volumes:

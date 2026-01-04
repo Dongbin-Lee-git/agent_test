@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime
+from typing import Any
 
 # 로그 디렉토리 생성
 LOG_DIR = "logs"
@@ -31,7 +32,6 @@ console_formatter = logging.Formatter('%(message)s')
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 
-from typing import Any
 
 def log_agent_step(agent_name: str, step_description: str, data: Any = None):
     message = f"[{agent_name}] {step_description}"

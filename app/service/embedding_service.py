@@ -1,7 +1,4 @@
-import os
 from typing import List
-from openai import OpenAI
-from dotenv import load_dotenv
 
 from app.core.llm import get_upstage_embeddings
 

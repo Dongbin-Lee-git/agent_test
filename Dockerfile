@@ -14,7 +14,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 의존성 파일만 먼저 복사
-#COPY pyproject.toml uv.lock ./
 COPY pyproject.toml ./
 
 # .venv에 의존성 설치 (dev 의존성 제외)
@@ -46,13 +45,16 @@ COPY --from=builder /app/app /app/app
 COPY --from=builder /app/infra /app/infra
 COPY --from=builder /app/template /app/template
 COPY --from=builder /app/pyproject.toml /app/pyproject.toml
+COPY entrypoint.sh /app/entrypoint.sh
 
 # venv를 기본 Python으로 사용
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
+USER root
+RUN chmod +x /app/entrypoint.sh
 USER appuser
 
-EXPOSE 80
+EXPOSE 8001 8002
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["/app/entrypoint.sh"]

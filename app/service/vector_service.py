@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from app.exceptions import KnowledgeBaseException
 from .embedding_service import EmbeddingService
 from ..repository.vector.vector_repo import VectorRepository

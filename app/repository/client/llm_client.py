@@ -1,5 +1,4 @@
 import os
-from typing import Any
 from langchain_upstage import ChatUpstage, UpstageEmbeddings
 from dotenv import load_dotenv
 from app.repository.client.base import BaseLLMClient

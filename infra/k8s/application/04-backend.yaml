@@ -23,7 +23,7 @@ spec:
         - name: backend
           image: ghcr.io/dongbin-lee-git/medical-qa:latest
           ports:
-            - containerPort: 8880
+            - containerPort: 8001
           resources:
             requests:
               cpu: "100m"
@@ -34,7 +34,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /agent/health
-              port: 8880
+              port: 8001
             initialDelaySeconds: 5
             periodSeconds: 5
           envFrom:
@@ -53,5 +53,5 @@ spec:
   selector:
     app: backend
   ports:
-    - port: 8880
-      targetPort: 8880
+    - port: 8001
+      targetPort: 8001

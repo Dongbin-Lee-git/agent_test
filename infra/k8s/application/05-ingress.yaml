@@ -15,4 +15,4 @@ spec:
               service:
                 name: backend
                 port:
-                  number: 8880
+                  number: 8001

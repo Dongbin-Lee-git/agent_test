@@ -6,5 +6,6 @@ metadata:
 data:
   CHROMA_HOST: "chromadb"
   CHROMA_PORT: "8000"
+  SEED_URL: "${SEED_URL}"
   UPSTAGE_API_KEY: "${UPSTAGE_API_KEY}"
   SERPER_API_KEY: "${SERPER_API_KEY}"

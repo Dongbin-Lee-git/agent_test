@@ -1,5 +1,6 @@
 import os
 import json
+import unicodedata
 import logging
 import zipfile
 import gdown
@@ -40,8 +41,7 @@ def get_seed_status():
 
 def download_and_extract_data():
     """구글 드라이브에서 데이터를 다운로드하고 압축을 해제합니다."""
-    file_id = "1mHW0y_eAJYyt-vQLLysHNobXlCoOvJtB"
-    url = f"https://drive.google.com/uc?id={file_id}"
+    url = os.getenv("SEED_URL")
     output = "resources/의료데이터.zip"
     extract_to = "resources"
 
@@ -50,12 +50,10 @@ def download_and_extract_data():
 
     try:
         if not os.path.exists(output):
-            logger.info(f"Downloading data from Google Drive (ID: {file_id})...")
-            print(f"[*] Downloading data from Google Drive...")
+            logger.info("Downloading data from SEED_URL...")
             gdown.download(url, output, quiet=False)
         
         logger.info(f"Extracting {output} to {extract_to}...")
-        print(f"[*] Extracting data...")
         with zipfile.ZipFile(output, 'r') as zip_ref:
             for file_info in zip_ref.infolist():
                 # zipfile은 한글 파일명을 인식하지 못하고 cp437로 처리하는 경우가 많음
@@ -70,7 +68,6 @@ def download_and_extract_data():
                         filename = file_info.filename
                 
                 # NFD(Mac) -> NFC 변환
-                import unicodedata
                 filename = unicodedata.normalize('NFC', filename)
                 
                 target_path = os.path.join(extract_to, filename)
@@ -82,16 +79,13 @@ def download_and_extract_data():
                         target.write(source.read())
 
         logger.info("Data extraction completed.")
-        print("[✓] Data extraction completed.")
     except Exception as e:
         logger.error(f"Error downloading or extracting data: {e}")
-        print(f"[!] Error downloading or extracting data: {e}")
 
 def load_medical_data(base_path: str = "resources/의료데이터") -> List[Dict[str, Any]]:
     # 데이터가 없으면 다운로드 시도
     if not os.path.exists(base_path) or not os.listdir(base_path):
         logger.info(f"Data directory {base_path} is missing or empty. Attempting to download...")
-        print(f"[*] Data directory {base_path} is missing or empty. Attempting to download...")
         download_and_extract_data()
 
     documents = []
@@ -131,22 +125,22 @@ def load_medical_data(base_path: str = "resources/의료데이터") -> List[Dict
                     logger.error(f"Error loading {file_path}: {e}")
     
     logger.info(f"Loaded {len(documents)} documents from {total_files} JSON files.")
-    print(f"[*] Loaded {len(documents)} documents from {total_files} JSON files.")
     return documents
 
 def seed_data_if_empty():
+    embedding_service = EmbeddingService()
     repo = ChromaDBRepository()
-    info = repo.get_collection_info()
+    vector_service = VectorService(repo, embedding_service)
+    
+    info = vector_service.get_collection_info()
     
     # 1개만 있는 경우는 이전 테스트의 잔재일 수 있으므로 10,000개 미만이면 시딩 시도
     if info["count"] >= 10000:
         logger.info(f"Collection {info['name']} already has {info['count']} documents. Skipping seed.")
-        print(f"[!] Collection {info['name']} already has {info['count']} documents. Skipping seed.")
         update_seed_status("completed", info["count"], info["count"], "Already seeded.")
         return
 
     logger.info(f"Collection {info['name']} has {info['count']} documents. Starting data seed to reach target...")
-    print(f"[*] Collection {info['name']} has {info['count']} documents. Starting data seed...")
     update_seed_status("in_progress", 0, 0, "Loading data...")
     
     medical_docs = load_medical_data()
@@ -159,14 +153,10 @@ def seed_data_if_empty():
     if not api_key:
         logger.warning("UPSTAGE_API_KEY not found. Seeding might fail.")
 
-    embedding_service = EmbeddingService()
-    vector_service = VectorService(repo, embedding_service)
-    
     # 데이터를 배치로 나누어 삽입
     batch_size = 1000
     total_docs = len(medical_docs)
     logger.info(f"Starting to add {total_docs} documents to ChromaDB in batches of {batch_size}...")
-    print(f"[*] Starting to add {total_docs} documents to ChromaDB... This may take a while.")
     update_seed_status("in_progress", 0, total_docs, "Starting batch insertion...")
     
     for i in range(0, total_docs, batch_size):
@@ -184,14 +174,11 @@ def seed_data_if_empty():
             current_count = i + len(batch)
             progress_msg = f"Progress: {current_count}/{total_docs} documents seeded ({(current_count/total_docs)*100:.1f}%)."
             logger.info(progress_msg)
-            print(f"[*] {progress_msg}")
             update_seed_status("in_progress", current_count, total_docs, progress_msg)
         except Exception as e:
             logger.error(f"Error seeding batch at index {i}: {e}")
-            print(f"[!] Error seeding batch at index {i}: {e}")
             update_seed_status("error", i, total_docs, str(e))
             raise e
 
     logger.info(f"Data seeding to {info['name']} completed successfully. Total: {total_docs} documents.")
-    print(f"[✓] Data seeding completed successfully. Total: {total_docs} documents.")
     update_seed_status("completed", total_docs, total_docs, "Seeding completed successfully.")
