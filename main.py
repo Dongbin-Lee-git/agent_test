@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 from app.api.route.agent_routers import router as agent_router
 from app.core.seed import seed_data_if_empty
+from app.exceptions import BaseAppException
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,6 +19,18 @@ async def lifespan(app: FastAPI):
     # 앱 종료 시 실행 (필요한 경우)
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(BaseAppException)
+async def base_app_exception_handler(request: Request, exc: BaseAppException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.__class__.__name__,
+            "message": exc.message,
+            "details": exc.details
+        },
+    )
 
 
 @app.exception_handler(ValueError)

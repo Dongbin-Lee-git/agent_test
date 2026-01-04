@@ -5,8 +5,10 @@ import pandas as pd
 import httpx
 import uuid
 
+import os
+
 # FastAPI 백엔드 URL
-BACKEND_URL = "http://localhost:1234"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:1234")
 
 st.set_page_config(
     page_title="의료 QA 에이전트",
@@ -55,9 +57,24 @@ if "messages" not in st.session_state:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        if "logs" in message:
+        if "reasoning" in message and message["reasoning"]:
             with st.expander("추론 로그 보기"):
-                st.json(message["logs"])
+                # 노드별 한글 명칭 맵핑 (UI용)
+                node_names = {
+                    "info_extract_agent_workflow": "🔍 내부 지식 검색 & 검증",
+                    "knowledge_augment_workflow": "🌐 외부 지식 보강 (Google)",
+                    "answer_gen_agent_workflow": "✍️ 답변 생성"
+                }
+                
+                for log_type, logs in message["reasoning"].items():
+                    if not logs: continue
+                    
+                    # 해당 로그의 노드 정보 확인
+                    node_id = logs[0].get("node", "unknown")
+                    display_node_name = node_names.get(node_id, node_id)
+                    
+                    st.write(f"### 📍 {display_node_name} ({node_id})")
+                    st.json(logs)
 
 # 사용자 입력
 if prompt := st.chat_input("의료 관련 질문을 입력하세요."):
@@ -73,10 +90,9 @@ if prompt := st.chat_input("의료 관련 질문을 입력하세요."):
         
         with st.status("🤔 에이전트가 생각 중입니다...", expanded=True) as status:
             full_response_data = {
-                "extract_logs": [],
-                "augment_logs": [],
-                "answer_logs": [],
-                "eval_logs": []
+                "history": [],
+                "reasoning": {},
+                "answer": ""
             }
             
             try:
@@ -104,8 +120,39 @@ if prompt := st.chat_input("의료 관련 질문을 입력하세요."):
                                         st.error(f"에러 발생: {event['error']}")
                                         break
                                     
-                                    # 이벤트 처리 및 UI 업데이트
+                                    # 히스토리 업데이트 (참고용)
+                                    if "history" in event and event["history"]:
+                                        full_response_data["history"].extend(event["history"])
+
+                                    # 답변 업데이트 및 실시간 표시
+                                    if "answer" in event and event["answer"]:
+                                        full_response_data["answer"] += event["answer"]
+                                        answer_placeholder.markdown(full_response_data["answer"])
+
+                                    # 추론 로그 업데이트: 현재 턴의 로그만 유지하도록 개선
+                                    if "reasoning" in event and event["reasoning"]:
+                                        for k, v in event["reasoning"].items():
+                                            if k not in full_response_data["reasoning"]:
+                                                full_response_data["reasoning"][k] = []
+                                            # v가 리스트인 경우만 처리
+                                            if isinstance(v, list):
+                                                for log_entry in v:
+                                                    # 중복 체크
+                                                    is_duplicate = False
+                                                    for existing in full_response_data["reasoning"][k]:
+                                                        if existing.get("content") == log_entry.get("content") and \
+                                                           existing.get("role") == log_entry.get("role") and \
+                                                           existing.get("tool_calls") == log_entry.get("tool_calls"):
+                                                            is_duplicate = True
+                                                            break
+                                                    
+                                                    if not is_duplicate:
+                                                        full_response_data["reasoning"][k].append(log_entry)
+
+                                    # 노드 상태 업데이트 (기존 로직 유지)
                                     for node_name, update in event.items():
+                                        if node_name in ["history", "reasoning", "answer"]: continue
+                                        
                                         # 한글 노드 명칭 맵핑
                                         node_display_names = {
                                             "info_extract_agent_workflow": "🔍 지식 추출 프로세스",
@@ -113,47 +160,24 @@ if prompt := st.chat_input("의료 관련 질문을 입력하세요."):
                                             "info_extract_tools": "🛠️ 검색 도구 실행",
                                             "info_verifier": "⚖️ 검색 결과 검증",
                                             "knowledge_augment_workflow": "🌐 외부 지식 보강 (Google)",
-                                            "answer_gen_agent_workflow": "✍️ 답변 작성",
-                                            "evaluate_agent_workflow": "⚖️ 답변 검증 및 평가"
+                                            "answer_gen_agent_workflow": "✍️ 답변 작성"
                                         }
                                         display_name = node_display_names.get(node_name, node_name)
                                         
                                         # 툴 호출 정보 표시
-                                        if "messages" in update:
+                                        if isinstance(update, dict) and "messages" in update:
                                             for msg in update["messages"]:
                                                 if "tool_calls" in msg:
                                                     for tc in msg["tool_calls"]:
-                                                        status.write(f"🛠️ **도구 호출**: `{tc['name']}` ({tc['args']})")
+                                                        status.write(f"🛠️ **도구 호출**: `{tc['name']}`")
                                         
                                         # 노드별 상세 정보 추출
                                         detail_info = ""
                                         if node_name == "info_extract_agent_workflow" and "extract_logs" in update:
-                                            last_log = update["extract_logs"][-1].get("content", "")
-                                            if "out_of_domain" in last_log:
-                                                detail_info = " (도메인 외 질문으로 판단됨)"
-                                            elif "success" in last_log:
-                                                detail_info = " (관련 정보 탐색 성공)"
-                                            elif "insufficient" in last_log:
-                                                detail_info = " (내부 정보 부족, 보강 필요)"
-                                                
-                                        elif node_name == "evaluate_agent_workflow" and "eval_logs" in update:
-                                            last_log = update["eval_logs"][-1].get("content", "")
-                                            if "final_score" in last_log:
-                                                detail_info = " (평가 완료)"
+                                            # (Note: Backwards compatibility for raw update format if needed)
+                                            pass
 
                                         status.update(label=f"⏳ {display_name} 진행 중...")
-                                        if detail_info:
-                                            status.write(f"✅ **{display_name}** 완료{detail_info}")
-                                        
-                                        # 로그 업데이트
-                                        for log_key in full_response_data.keys():
-                                            if log_key in update:
-                                                full_response_data[log_key].extend(update[log_key])
-                                        
-                                        # 실시간 답변 표시 (answer_placeholder는 status 외부)
-                                        if "answer_logs" in update and update["answer_logs"]:
-                                            answer = update["answer_logs"][-1].get("content", "")
-                                            answer_placeholder.markdown(answer)
                                             
                                 except json.JSONDecodeError:
                                     continue
@@ -165,26 +189,37 @@ if prompt := st.chat_input("의료 관련 질문을 입력하세요."):
                 status.update(label="❌ 연결 오류", state="error")
 
         # 최종 답변 정리 및 저장
-        final_answer = ""
-        if full_response_data["answer_logs"]:
-            final_answer = full_response_data["answer_logs"][-1].get("content", "")
-        
+        final_answer = full_response_data["answer"]
         if not final_answer:
             final_answer = "답변을 생성하지 못했습니다."
         
         answer_placeholder.markdown(final_answer)
         
         # 로그 표시
-        logs_to_show = {k: v for k, v in full_response_data.items() if v}
-        if logs_to_show:
+        if full_response_data["reasoning"]:
             with log_placeholder.expander("추론 로그 보기"):
-                st.json(logs_to_show)
+                # 노드별 한글 명칭 맵핑 (UI용)
+                node_names = {
+                    "info_extract_agent_workflow": "🔍 내부 지식 검색 & 검증",
+                    "knowledge_augment_workflow": "🌐 외부 지식 보강 (Google)",
+                    "answer_gen_agent_workflow": "✍️ 답변 생성"
+                }
+                
+                for log_type, logs in full_response_data["reasoning"].items():
+                    if not logs: continue
+                    
+                    # 해당 로그의 노드 정보 확인
+                    node_id = logs[0].get("node", "unknown")
+                    display_node_name = node_names.get(node_id, node_id)
+                    
+                    st.write(f"### 📍 {display_node_name} ({node_id})")
+                    st.json(logs)
         
         # 세션 상태에 저장
         st.session_state.messages.append({
             "role": "assistant", 
             "content": final_answer,
-            "logs": logs_to_show
+            "reasoning": full_response_data["reasoning"]
         })
 
 # 하단 정보

@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Optional
+from app.exceptions import KnowledgeBaseException
 from .embedding_service import EmbeddingService
 from ..repository.vector.vector_repo import VectorRepository
 
@@ -16,26 +17,31 @@ class VectorService:
         metadatas: List[Dict[str, Any]] = None,
         ids: List[str] = None
     ):
-            
-        embeddings = self.embedding_service.create_embeddings(documents)
-        self.vector_repository.add_documents(
-            documents=documents, embeddings=embeddings, metadatas=metadatas, ids=ids
-        )
+        try:
+            embeddings = self.embedding_service.create_embeddings(documents)
+            self.vector_repository.add_documents(
+                documents=documents, embeddings=embeddings, metadatas=metadatas, ids=ids
+            )
+        except Exception as e:
+            raise KnowledgeBaseException(f"Failed to add documents: {str(e)}")
 
     def search(self, query: str, n_results: int = 5) -> Dict[str, Any]:
-        query_embedding = self.embedding_service.create_embedding(query)
+        try:
+            query_embedding = self.embedding_service.create_embedding(query)
 
-        results = self.vector_repository.query(
-            query_embeddings=[query_embedding],
-            n_results=n_results,
-            include=["documents", "metadatas", "distances"],
-        )
+            results = self.vector_repository.query(
+                query_embeddings=[query_embedding],
+                n_results=n_results,
+                include=["documents", "metadatas", "distances"],
+            )
 
-        return {
-            "documents": results["documents"][0],
-            "metadatas": results["metadatas"][0],
-            "distances": results["distances"][0],
-        }
+            return {
+                "documents": results["documents"][0],
+                "metadatas": results["metadatas"][0],
+                "distances": results["distances"][0],
+            }
+        except Exception as e:
+            raise KnowledgeBaseException(f"Search failed: {str(e)}")
 
     def delete_document(self, doc_id: str):
         self.vector_repository.delete_documents([doc_id])

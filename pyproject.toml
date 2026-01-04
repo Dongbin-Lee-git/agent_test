@@ -1,5 +1,5 @@
 [project]
-name = "upstage-gangwon-project"
+name = "project"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -24,6 +24,7 @@ dependencies = [
     "transformers",
     "streamlit",
     "pandas",
+    "gdown",
 ]
 
 [tool.pytest.ini_options]

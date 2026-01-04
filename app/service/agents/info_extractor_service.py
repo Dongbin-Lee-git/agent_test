@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage
+from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from app.agents.subgraphs.info_extractor import info_extract_graph
 
@@ -17,8 +17,13 @@ class InfoExtractorService:
         
         sub_result = info_extract_graph.invoke({"messages": messages}, config=config)
         
-        # Only return the AI messages from the subgraph to avoid re-adding Human/System messages
-        new_messages = [msg for msg in sub_result["messages"] if not isinstance(msg, HumanMessage) and not isinstance(msg, SystemMessage)]
+        # sub_result["messages"] contains the full conversation history + new messages.
+        # We only want the AI messages produced *after* our handoff message.
+        history_len = len(messages)
+        new_messages = [
+            msg for msg in sub_result["messages"][history_len:] 
+            if isinstance(msg, AIMessage)
+        ]
         
         return {
             "extract_logs": new_messages,

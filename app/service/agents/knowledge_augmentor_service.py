@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from app.agents.subgraphs.knowledge_augmentor import knowledge_augment_graph
 
@@ -12,8 +12,12 @@ class KnowledgeAugmentorService:
         
         sub_result = knowledge_augment_graph.invoke({"messages": messages}, config=config)
         
-        # Filter messages
-        new_messages = [msg for msg in sub_result["messages"] if not isinstance(msg, HumanMessage) and not isinstance(msg, SystemMessage)]
+        # Filter messages: Only new AI messages
+        history_len = len(messages)
+        new_messages = [
+            msg for msg in sub_result["messages"][history_len:] 
+            if isinstance(msg, AIMessage)
+        ]
         
         return {
             "augment_logs": new_messages,

@@ -1,46 +1,23 @@
-import json
-import re
-
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from app.agents.state import MainState
 from langchain_core.runnables import RunnableConfig
 
-from app.service.agents.knowledge_augmentor_service import KnowledgeAugmentorService
-from app.service.agents.info_extractor_service import InfoExtractorService
-from app.service.agents.answer_gen_service import AnswerGenService
-from app.service.agents.evaluator_service import EvaluatorService
-
-# Initialize services
-knowledge_augmentor_service = KnowledgeAugmentorService()
-info_extractor_service = InfoExtractorService()
-answer_gen_service = AnswerGenService()
-evaluator_service = EvaluatorService()
-
-def clean_and_parse_json(text: str):
-    # Keep this for internal status checks in workflow.py if needed, 
-    # or use the one in services.
-    try:
-        match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
-        if match: text = match.group(1)
-        else:
-            match = re.search(r"(\{.*\})", text, re.DOTALL)
-            if match: text = match.group(1)
-        return json.loads(text)
-    except:
-        return None
-
 from app.core.logger import log_agent_step
+from app.agents.utils import clean_and_parse_json
 
+# Functions to call agents via services
 def call_info_extractor(state: MainState, config: RunnableConfig):
     log_agent_step("Workflow", "Step 1: MedicalInfoExtractor 시작 (RAG)")
     print(f"\n[Workflow] Step 1: MedicalInfoExtractor 시작 (Query: {state['user_query']})")
+    
+    # Get service from config
+    info_extractor_service = config["configurable"].get("info_extractor_service")
     
     # loop_count 초기화 및 증가
     current_count = state.get("loop_count", 0) + 1
     
     # InfoExtractor 실행
-    # pass build_logs if available to provide context to info extractor
     result = info_extractor_service.run(
         state["user_query"], 
         state.get("augment_logs", []), 
@@ -64,6 +41,10 @@ def call_info_extractor(state: MainState, config: RunnableConfig):
 def call_knowledge_augmentor(state: MainState, config: RunnableConfig):
     log_agent_step("Workflow", "Step 2: MedicalKnowledgeAugmentor 시작 (Google Search)")
     print(f"\n[Workflow] Step 2: MedicalKnowledgeAugmentor 시작")
+    
+    # Get service from config
+    knowledge_augmentor_service = config["configurable"].get("knowledge_augmentor_service")
+
     result = knowledge_augmentor_service.run(
         state["user_query"], 
         config=config,
@@ -77,6 +58,10 @@ def call_knowledge_augmentor(state: MainState, config: RunnableConfig):
 def call_answer_gen(state: MainState, config: RunnableConfig):
     log_agent_step("Workflow", "Step 3: MedicalConsultant 시작")
     print(f"\n[Workflow] Step 3: MedicalConsultant (AnswerGen) 시작")
+    
+    # Get service from config
+    answer_gen_service = config["configurable"].get("answer_gen_service")
+
     result = answer_gen_service.run(
         state["user_query"], 
         state.get("extract_logs", []), 
@@ -89,21 +74,6 @@ def call_answer_gen(state: MainState, config: RunnableConfig):
         print(f"[Workflow] Step 3 완료. 답변 생성됨.")
     return result
 
-def call_evaluate_agent(state: MainState):
-    log_agent_step("Workflow", "Step 4: MedicalEvaluator 시작")
-    print(f"\n[Workflow] Step 4: MedicalEvaluator 시작")
-    result = evaluator_service.run(
-        state["user_query"],
-        state.get("answer_logs", []),
-        state.get("extract_logs")
-    )
-    if "eval_logs" in result:
-        last_msg = result["eval_logs"][-1].content
-        parsed = clean_and_parse_json(last_msg)
-        score = parsed.get("final_score") if parsed else "N/A"
-        log_agent_step("Workflow", "Step 4 완료", {"score": score})
-        print(f"[Workflow] Step 4 완료. 최종 점수: {score}")
-    return result
 
 def check_extract_status(state: MainState):
     if not state.get("extract_logs"): return "augment"
@@ -141,7 +111,6 @@ super_workflow = StateGraph(MainState)
 super_workflow.add_node("info_extract_agent_workflow", call_info_extractor)
 super_workflow.add_node("knowledge_augment_workflow", call_knowledge_augmentor)
 super_workflow.add_node("answer_gen_agent_workflow", call_answer_gen)
-super_workflow.add_node("evaluate_agent_workflow", call_evaluate_agent)
 
 super_workflow.set_conditional_entry_point(
     router_node,
@@ -160,8 +129,7 @@ super_workflow.add_conditional_edges(
 )
 # Augment 이후 다시 추출을 시도
 super_workflow.add_edge("knowledge_augment_workflow", "info_extract_agent_workflow")
-super_workflow.add_edge("answer_gen_agent_workflow", "evaluate_agent_workflow")
-super_workflow.add_edge("evaluate_agent_workflow", END)
+super_workflow.add_edge("answer_gen_agent_workflow", END)
 
 # 메모리 기반 체크포인터 추가 (대화 기록 보존용)
 memory = MemorySaver()

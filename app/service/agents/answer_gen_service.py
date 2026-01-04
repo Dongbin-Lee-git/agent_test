@@ -1,28 +1,16 @@
-import json
-import re
 from typing import Dict, Any, List
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from app.agents.subgraphs.answer_gen import answer_gen_graph
+from app.agents.utils import clean_and_parse_json
 
 class AnswerGenService:
-    def _clean_and_parse_json(self, text: str):
-        try:
-            match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
-            if match: text = match.group(1)
-            else:
-                match = re.search(r"(\{.*\})", text, re.DOTALL)
-                if match: text = match.group(1)
-            return json.loads(text)
-        except:
-            return None
-
     def run(self, user_query: str, extract_logs: List[BaseMessage], config: RunnableConfig = None, history: List[BaseMessage] = None) -> Dict[str, Any]:
         if not extract_logs:
             return {"answer_logs": [AIMessage(content="Failed to extract info.")], "process_status": "fail"}
         
         last_extract_msg = extract_logs[-1]
-        parsed_result = self._clean_and_parse_json(last_extract_msg.content)
+        parsed_result = clean_and_parse_json(last_extract_msg.content)
         
         status = parsed_result.get("status") if parsed_result else "unknown"
         medical_context = parsed_result.get("medical_context", "") if parsed_result else ""
@@ -40,8 +28,12 @@ class AnswerGenService:
         
         sub_result = answer_gen_graph.invoke({"messages": messages}, config=config)
         
-        # Filter messages
-        new_messages = [msg for msg in sub_result["messages"] if not isinstance(msg, HumanMessage) and not isinstance(msg, SystemMessage)]
+        # Filter messages: Only new AI messages
+        history_len = len(messages)
+        new_messages = [
+            msg for msg in sub_result["messages"][history_len:] 
+            if isinstance(msg, AIMessage)
+        ]
         
         return {
             "answer_logs": new_messages,
