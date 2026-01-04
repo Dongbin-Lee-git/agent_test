@@ -43,7 +43,6 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/main.py /app/main.py
 COPY --from=builder /app/app /app/app
 COPY --from=builder /app/infra /app/infra
-COPY --from=builder /app/template /app/template
 COPY --from=builder /app/pyproject.toml /app/pyproject.toml
 COPY entrypoint.sh /app/entrypoint.sh
 
