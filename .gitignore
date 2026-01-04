@@ -1,0 +1,28 @@
+# Data & Resources
+resources/
+chroma_db/
+chroma_data/
+
+# Logs
+logs/
+*.log
+app.log
+ui.log
+
+# PID files
+*.pid
+app.pid
+ui.pid
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
