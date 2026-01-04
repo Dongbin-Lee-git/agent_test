@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/dongbin-lee-git/medical-qa:latest
+          image: ghcr.io/dongbin-lee-git/medical-qa-backend:latest
           ports:
             - containerPort: 8001
           resources:

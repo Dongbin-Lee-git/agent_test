@@ -42,9 +42,15 @@ jobs:
           echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           echo "Generated version: ${VERSION_TAG}"
 
-      - name: Set image name
+      - name: Set image name and repo name
         run: |
-          echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+#           전체 경로를 소문자로 변환 (이미지용)
+          FULL_REPO_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=ghcr.io/${FULL_REPO_NAME}" >> $GITHUB_ENV
+                
+#           저장소 이름만 추출 (예: owner/my-repo -> my-repo)
+          REPO_ONLY=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}' | tr '[:upper:]' '[:lower:]')
+          echo "REPO_NAME=${REPO_ONLY}" >> $GITHUB_ENV
 
       - name: Build & Push
         run: |
@@ -52,10 +58,20 @@ jobs:
 
           VERSION_TAG="${{ steps.version.outputs.version_tag }}"
 
+          # Backend 빌드 및 푸시
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            -t "${IMAGE_NAME}:${VERSION_TAG}" \
-            -t "${IMAGE_NAME}:latest" \
+            --target backend \
+            -t "${IMAGE_NAME}-backend:${VERSION_TAG}" \
+            -t "${IMAGE_NAME}-backend:latest" \
+            --push .
+
+          # Frontend 빌드 및 푸시
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --target frontend \
+            -t "${IMAGE_NAME}-frontend:${VERSION_TAG}" \
+            -t "${IMAGE_NAME}-frontend:latest" \
             --push .
 
       - name: Deploy on K8s
@@ -68,11 +84,20 @@ jobs:
             set -euo pipefail
 
             VERSION_TAG="${{ steps.version.outputs.version_tag }}"
+            FULL_REPO_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+            IMAGE_BASE="ghcr.io/${FULL_REPO_NAME}"
 
-            cd /home/ubuntu/deploy/medical-qa/infra/k8s/application
+            cd "/home/ubuntu/deploy/${REPO_NAME}/infra/k8s/application"
 
-            sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${VERSION_TAG}|g" 04-backend.yaml
+            # Backend 업데이트
+            sed -i "s|image: .*|image: ${IMAGE_BASE}-backend:${VERSION_TAG}|g" 04-backend.yaml
             sed -i "s|value: \".*\"|value: \"${VERSION_TAG}\"|g" 04-backend.yaml
 
+            # Frontend 업데이트
+            sed -i "s|image: .*|image: ${IMAGE_BASE}-frontend:${VERSION_TAG}|g" 05-frontend.yaml
+
             kubectl apply -f 04-backend.yaml
+            kubectl apply -f 05-frontend.yaml
+            
             git checkout 04-backend.yaml
+            git checkout 05-frontend.yaml
