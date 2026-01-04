@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/dongbin-lee-git/medical-qa-frontend:latest
+          image: ghcr.io/dongbin-lee-git/agent_test-frontend:latest
           ports:
             - containerPort: 8002
           resources:
