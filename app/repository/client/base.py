@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional
+from typing import Any
+
 
 class BaseLLMClient(ABC):
     @abstractmethod
@@ -9,6 +10,7 @@ class BaseLLMClient(ABC):
     @abstractmethod
     def get_embedding_model(self) -> Any:
         pass
+
 
 class BaseSearchClient(ABC):
     @abstractmethod

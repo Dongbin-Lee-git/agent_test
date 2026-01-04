@@ -1,184 +1,196 @@
 import os
 import json
-import unicodedata
 import logging
 import zipfile
+import unicodedata
 import gdown
-from typing import List, Dict, Any
+from pathlib import Path
+from typing import Iterator, Dict, Any, List
+
+from app.models.entities.medical_qa import MedicalQA
 from app.service.vector_service import VectorService
 from app.repository.vector.vector_repo import ChromaDBRepository
 from app.service.embedding_service import EmbeddingService
 
-# 전역 로깅 설정 (콘솔 출력 보장)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# 로거 설정
 logger = logging.getLogger("seed")
 
-SEED_STATUS_FILE = "/tmp/seed_status.json"
 
-def update_seed_status(status: str, current: int = 0, total: int = 0, message: str = ""):
-    try:
-        with open(SEED_STATUS_FILE, "w") as f:
-            json.dump({
-                "status": status,
-                "current": current,
-                "total": total,
-                "message": message
-            }, f)
-    except Exception as e:
-        logger.error(f"Failed to update seed status: {e}")
+class SeedManager:
+    """의료 데이터 다운로드 및 벡터 DB 시딩을 담당하는 매니저 클래스"""
 
-def get_seed_status():
-    if not os.path.exists(SEED_STATUS_FILE):
-        return {"status": "not_started", "current": 0, "total": 0, "message": "No seed status found."}
-    try:
-        with open(SEED_STATUS_FILE, "r") as f:
-            return json.load(f)
-    except Exception as e:
-        return {"status": "error", "current": 0, "total": 0, "message": str(e)}
+    def __init__(self):
+        self.seed_status_file = Path("/tmp/seed_status.json")
+        self.resource_dir = Path("resources")
+        self.data_dir = self.resource_dir / "의료데이터"
+        self.zip_path = self.resource_dir / "의료데이터.zip"
+        self.seed_url = os.getenv("SEED_URL")
 
-def download_and_extract_data():
-    """구글 드라이브에서 데이터를 다운로드하고 압축을 해제합니다."""
-    url = os.getenv("SEED_URL")
-    output = "resources/의료데이터.zip"
-    extract_to = "resources"
+        # 서비스 초기화
+        self.vector_service = VectorService(ChromaDBRepository(), EmbeddingService())
 
-    if not os.path.exists(extract_to):
-        os.makedirs(extract_to)
+    def get_status(self) -> Dict[str, Any]:
+        """현재 시딩 상태를 반환합니다."""
+        if not self.seed_status_file.exists():
+            return {"status": "not_started", "current": 0, "total": 0, "message": "Ready"}
+        try:
+            with open(self.seed_status_file, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
-    try:
-        if not os.path.exists(output):
-            logger.info("Downloading data from SEED_URL...")
-            gdown.download(url, output, quiet=False)
-        
-        logger.info(f"Extracting {output} to {extract_to}...")
-        with zipfile.ZipFile(output, 'r') as zip_ref:
+    def _update_status(self, status: str, current: int = 0, total: int = 0, message: str = ""):
+        """상태 파일 업데이트 (내부용)"""
+        try:
+            with open(self.seed_status_file, "w") as f:
+                json.dump({
+                    "status": status,
+                    "current": current,
+                    "total": total,
+                    "message": message
+                }, f)
+        except Exception as e:
+            logger.error(f"Failed to update status: {e}")
+
+    def _download_and_extract(self):
+        """데이터 다운로드 및 압축 해제"""
+        if not self.resource_dir.exists():
+            self.resource_dir.mkdir(parents=True)
+
+        # 다운로드
+        if not self.zip_path.exists():
+            if not self.seed_url:
+                raise ValueError("SEED_URL environment variable is not set.")
+            logger.info("Downloading data...")
+            gdown.download(self.seed_url, str(self.zip_path), quiet=False)
+
+        # 압축 해제
+        logger.info(f"Extracting {self.zip_path}...")
+        with zipfile.ZipFile(self.zip_path, 'r') as zip_ref:
             for file_info in zip_ref.infolist():
-                # zipfile은 한글 파일명을 인식하지 못하고 cp437로 처리하는 경우가 많음
+                # 한글 파일명 인코딩 보정 (cp437 -> cp949/utf-8 -> NFC)
                 try:
-                    # Mac/Linux UTF-8 시도
-                    filename = file_info.filename.encode('cp437').decode('utf-8')
+                    filename = file_info.filename.encode('cp437').decode('cp949')
                 except:
-                    try:
-                        # Windows CP949 시도
-                        filename = file_info.filename.encode('cp437').decode('cp949')
-                    except:
-                        filename = file_info.filename
-                
-                # NFD(Mac) -> NFC 변환
+                    filename = file_info.filename
+
                 filename = unicodedata.normalize('NFC', filename)
-                
-                target_path = os.path.join(extract_to, filename)
-                if file_info.is_dir():
-                    os.makedirs(target_path, exist_ok=True)
+                # target_path 보정: '의료데이터/' 가 포함된 경우 이를 self.resource_dir 기준으로 정규화
+                if filename.startswith('의료데이터/'):
+                    target_path = self.resource_dir / filename
                 else:
-                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                    # 압축 파일 내에 최상위 폴더가 없는 경우 '의료데이터' 폴더 안에 넣도록 유도하거나, 
+                    # 현재 코드 구조상 self.data_dir가 'resources/의료데이터'이므로 
+                    # filename 자체가 '의료데이터'로 시작하지 않는 경우를 처리
+                    target_path = self.resource_dir / filename
+
+                if file_info.is_dir():
+                    target_path.mkdir(parents=True, exist_ok=True)
+                else:
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
                     with zip_ref.open(file_info) as source, open(target_path, "wb") as target:
                         target.write(source.read())
 
-        logger.info("Data extraction completed.")
-    except Exception as e:
-        logger.error(f"Error downloading or extracting data: {e}")
+        # 만약 압축 해제 후 self.data_dir 가 존재하지 않는다면, 
+        # 자소 분리된 이름의 폴더가 생성되었을 가능성이 큼. 이를 '의료데이터'로 이름 변경 시도
+        extracted_dirs = [d for d in self.resource_dir.iterdir() if d.is_dir() and d.name != "__MACOSX"]
+        if not self.data_dir.exists() and extracted_dirs:
+            # 가장 유력한 후보(첫 번째 폴더)를 '의료데이터'로 변경
+            # (자소 분리 문제로 인해 self.data_dir.exists()가 False인 상황 가정)
+            candidate = extracted_dirs[0]
+            logger.info(f"Renaming {candidate.name} to {self.data_dir.name}")
+            candidate.rename(self.data_dir)
 
-def load_medical_data(base_path: str = "resources/의료데이터") -> List[Dict[str, Any]]:
-    # 데이터가 없으면 다운로드 시도
-    if not os.path.exists(base_path) or not os.listdir(base_path):
-        logger.info(f"Data directory {base_path} is missing or empty. Attempting to download...")
-        download_and_extract_data()
+    def _load_documents_generator(self) -> Iterator[MedicalQA]:
+        """JSON 파일을 읽어 문서를 하나씩 반환하는 제너레이터 (메모리 절약)"""
+        if not self.data_dir.exists():
+            self._download_and_extract()
 
-    documents = []
-    if not os.path.exists(base_path):
-        logger.warning(f"Path still not found after download attempt: {base_path}")
-        return documents
+        logger.info(f"Loading documents from {self.data_dir}")
+        count = 0
+        for file_path in self.data_dir.rglob("*.json"):
+            try:
+                with open(file_path, "r", encoding="utf-8-sig") as f:
+                    data = json.load(f)
+                    # "Q: ..., A: ..." 형식으로 document 생성
+                    document = f"Q: {data.get('question', '')}\nA: {data.get('answer', '')}"
 
-    total_files = 0
-    for root, dirs, files in os.walk(base_path):
-        for file in files:
-            if file.endswith(".json"):
-                total_files += 1
-                file_path = os.path.join(root, file)
-                try:
-                    logger.debug(f"Loading medical data from: {file_path}")
-                    with open(file_path, "r", encoding="utf-8-sig") as f:
-                        data = json.load(f)
-                        # JSON 형식에 따라 content 구성
-                        # 예시에서 본 구조: question, answer
-                        question = data.get("question", "")
-                        answer = data.get("answer", "")
-                        content = f"질문: {question}\n답변: {answer}"
-                        
-                        metadata = {
-                            "source": file_path,
-                            "qa_id": data.get("qa_id"),
-                            "domain": data.get("domain"),
-                            "q_type": data.get("q_type")
-                        }
-                        
-                        documents.append({
-                            "content": content,
-                            "metadata": metadata,
-                            "id": f"medical_{data.get('qa_id', file)}"
-                        })
-                except Exception as e:
-                    logger.error(f"Error loading {file_path}: {e}")
-    
-    logger.info(f"Loaded {len(documents)} documents from {total_files} JSON files.")
-    return documents
+                    # 나머지 정보들을 metadata 텍스트로도 포함
+                    extra_info = f"Domain: {data.get('domain', 'N/A')}, Type: {data.get('q_type', 'N/A')}"
 
-def seed_data_if_empty():
-    embedding_service = EmbeddingService()
-    repo = ChromaDBRepository()
-    vector_service = VectorService(repo, embedding_service)
-    
-    info = vector_service.get_collection_info()
-    
-    # 1개만 있는 경우는 이전 테스트의 잔재일 수 있으므로 10,000개 미만이면 시딩 시도
-    if info["count"] >= 10000:
-        logger.info(f"Collection {info['name']} already has {info['count']} documents. Skipping seed.")
-        update_seed_status("completed", info["count"], info["count"], "Already seeded.")
-        return
+                    yield MedicalQA(
+                        id=f"medical_{data.get('qa_id', file_path.stem)}",
+                        document=document,
+                        metadata={"extra_info": extra_info}
+                    )
+                    count += 1
+            except Exception as e:
+                logger.error(f"Error parsing {file_path}: {e}")
 
-    logger.info(f"Collection {info['name']} has {info['count']} documents. Starting data seed to reach target...")
-    update_seed_status("in_progress", 0, 0, "Loading data...")
-    
-    medical_docs = load_medical_data()
-    if not medical_docs:
-        logger.warning("No medical data found to seed.")
-        update_seed_status("completed", info["count"], info["count"], "No data found to seed.")
-        return
+        logger.info(f"Total documents loaded from generator: {count}")
 
-    api_key = os.getenv("UPSTAGE_API_KEY")
-    if not api_key:
-        logger.warning("UPSTAGE_API_KEY not found. Seeding might fail.")
-
-    # 데이터를 배치로 나누어 삽입
-    batch_size = 1000
-    total_docs = len(medical_docs)
-    logger.info(f"Starting to add {total_docs} documents to ChromaDB in batches of {batch_size}...")
-    update_seed_status("in_progress", 0, total_docs, "Starting batch insertion...")
-    
-    for i in range(0, total_docs, batch_size):
-        batch = medical_docs[i:i + batch_size]
-        contents = [doc["content"] for doc in batch]
-        metadatas = [doc["metadata"] for doc in batch]
-        ids = [doc["id"] for doc in batch]
-        
+    def run(self):
+        """시딩 프로세스 메인 실행 함수"""
         try:
-            vector_service.add_documents(
-                documents=contents,
-                metadatas=metadatas,
-                ids=ids
-            )
-            current_count = i + len(batch)
-            progress_msg = f"Progress: {current_count}/{total_docs} documents seeded ({(current_count/total_docs)*100:.1f}%)."
-            logger.info(progress_msg)
-            update_seed_status("in_progress", current_count, total_docs, progress_msg)
+            # 1. 데이터 준비 및 파일 카운팅 (먼저 수행)
+            self._update_status("in_progress", 0, 0, "Checking file integrity...")
+
+            # 파일 시스템의 데이터를 먼저 로드하여 전체 개수 파악
+            documents = list(self._load_documents_generator())
+            total_docs = len(documents)
+
+            if total_docs == 0:
+                self._update_status("completed", 0, 0, "No data files found.")
+                return
+
+            # 2. DB 상태 확인 및 비교
+            info = self.vector_service.get_collection_info()
+            current_db_count = info["count"]
+
+            # 파일 개수와 DB 개수가 같거나 DB가 더 많으면(중복 포함 등) 완료된 것으로 간주
+            if current_db_count >= total_docs:
+                logger.info(f"Already seeded correctly (DB: {current_db_count}, Files: {total_docs}). Skipping.")
+                self._update_status("completed", current_db_count, total_docs, "Already seeded.")
+                return
+
+            logger.info(f"Seeding required. DB has {current_db_count}, but files have {total_docs}.")
+
+            # 3. 배치 처리 및 삽입
+            batch_size = 100
+            self._update_status("in_progress", current_db_count, total_docs, "Inserting vectors...")
+
+            # 효율성을 위해 전체를 다시 넣되, 이미 존재하는 ID는 ChromaDB가 처리(upsert/ignore 정책에 따름)
+            # 여기서는 단순화를 위해 리스트 순회
+            for i in range(0, total_docs, batch_size):
+                batch: List[MedicalQA] = documents[i: i + batch_size]
+
+                self.vector_service.add_documents(
+                    documents=[d.document for d in batch],
+                    metadatas=[d.metadata for d in batch],
+                    ids=[d.id for d in batch]
+                )
+
+                current = min(i + len(batch), total_docs)
+                self._update_status("in_progress", current, total_docs,
+                                    f"Seeding... {int(current / total_docs * 100)}%")
+                logger.info(f"Seeded batch {current}/{total_docs}")
+
+            self._update_status("completed", total_docs, total_docs, "Seeding completed.")
+            logger.info("Seeding finished successfully.")
+
         except Exception as e:
-            logger.error(f"Error seeding batch at index {i}: {e}")
-            update_seed_status("error", i, total_docs, str(e))
+            logger.exception("Seeding failed")
+            self._update_status("error", 0, 0, str(e))
             raise e
 
-    logger.info(f"Data seeding to {info['name']} completed successfully. Total: {total_docs} documents.")
-    update_seed_status("completed", total_docs, total_docs, "Seeding completed successfully.")
+
+# 싱글톤 인스턴스 또는 함수 인터페이스 제공
+seed_manager = SeedManager()
+
+
+def get_seed_status():
+    return seed_manager.get_status()
+
+
+def seed_data_if_empty():
+    seed_manager.run()

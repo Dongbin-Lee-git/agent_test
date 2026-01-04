@@ -5,6 +5,7 @@ from app.repository.client.base import BaseLLMClient
 
 load_dotenv()
 
+
 class UpstageClient(BaseLLMClient):
     def __init__(self):
         self.api_key = os.getenv("UPSTAGE_API_KEY")

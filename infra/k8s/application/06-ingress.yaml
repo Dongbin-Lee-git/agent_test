@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: backend-ingress
+  name: app-ingress
   namespace: medical-qa
 spec:
   ingressClassName: nginx
@@ -10,6 +10,13 @@ spec:
       http:
         paths:
           - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8002
+          - path: /agent
             pathType: Prefix
             backend:
               service:

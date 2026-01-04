@@ -1,3 +1,3 @@
-from .medical_qa import MedicalQA
+from .medical_qa import BaseEntity, MedicalQA
 
-__all__ = ["MedicalQA"]
+__all__ = ["BaseEntity", "MedicalQA"]

@@ -1,19 +1,29 @@
 from .agent import (
-    AddKnowledgeRequest, 
-    KnowledgeResponse, 
-    StatsResponse, 
-    ChatRequest, 
+    BaseSchema,
+    ChatRequest,
     ChatResponse,
-    Message,
-    AgentRunRequest
+    AgentRunRequest,
+    StreamEvent,
+    TokenStreamEvent,
+    LogStreamEvent,
+    ErrorStreamEvent
+)
+from .knowledge import (
+    AddKnowledgeRequest,
+    KnowledgeResponse,
+    StatsResponse
 )
 
 __all__ = [
-    "AddKnowledgeRequest",
-    "KnowledgeResponse",
-    "StatsResponse",
+    "BaseSchema",
     "ChatRequest",
     "ChatResponse",
-    "Message",
-    "AgentRunRequest"
+    "AgentRunRequest",
+    "StreamEvent",
+    "TokenStreamEvent",
+    "LogStreamEvent",
+    "ErrorStreamEvent",
+    "AddKnowledgeRequest",
+    "KnowledgeResponse",
+    "StatsResponse"
 ]

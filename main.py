@@ -7,6 +7,7 @@ from app.api.route.agent_routers import router as agent_router
 from app.core.seed import seed_data_if_empty
 from app.exceptions import BaseAppException
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 앱 시작 시 실행
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
     loop.run_in_executor(None, seed_data_if_empty)
     yield
     # 앱 종료 시 실행 (필요한 경우)
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -58,8 +60,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 app.include_router(agent_router)
 
-
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=1234)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

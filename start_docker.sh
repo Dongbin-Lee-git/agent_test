@@ -4,8 +4,10 @@
 set -e
 
 echo "1. Docker 이미지 빌드 중..."
-echo "- 통합 이미지: medical-qa-app:latest"
-docker build -t medical-qa-app:latest .
+echo "- 백엔드 이미지: medical-qa-backend:latest"
+docker build --target backend -t medical-qa-backend:latest .
+echo "- 프론트엔드 이미지: medical-qa-frontend:latest"
+docker build --target frontend -t medical-qa-frontend:latest .
 
 echo "2. Docker Compose 실행 중..."
 docker-compose up -d
@@ -13,8 +15,8 @@ docker-compose up -d
 echo "3. 서비스 준비 상태 확인 중..."
 while true; do
     # backend 컨테이너가 실행 중인지 확인
-    if ! docker ps | grep -q medical-qa-app; then
-        echo -ne "\r[*] medical-qa-app container is not running. Waiting..."
+    if ! docker ps | grep -q medical-qa-backend || ! docker ps | grep -q medical-qa-frontend; then
+        echo -ne "\r[*] medical-qa containers are not running. Waiting..."
         sleep 5
         continue
     fi

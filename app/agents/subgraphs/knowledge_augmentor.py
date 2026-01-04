@@ -3,6 +3,7 @@ from langgraph.prebuilt import ToolNode
 from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from app.agents.state import InfoBuildAgentState
 from app.agents.tools import google_search, add_to_medical_qa, solar_chat
+from app.agents.utils import get_current_time_str
 from app.core.logger import log_agent_step
 
 instruction_augment = """
@@ -21,9 +22,10 @@ You are the 'MedicalKnowledgeAugmentor'. Your goal is to search Google for medic
 augment_tools = [google_search, add_to_medical_qa]
 llm_augment = solar_chat.bind_tools(augment_tools)
 
+
 def augment_agent(state: InfoBuildAgentState):
     messages = state["messages"]
-    
+
     # Check for recent tool results and log summary
     if messages and isinstance(messages[-1], ToolMessage):
         last_msg = messages[-1]
@@ -35,8 +37,10 @@ def augment_agent(state: InfoBuildAgentState):
             log_agent_step("KnowledgeAugmentor", "Google 검색 결과 요약", {"summary": summary})
 
     if not messages or not isinstance(messages[0], SystemMessage):
-        messages = [SystemMessage(content=instruction_augment)] + messages
-    
+        current_time = get_current_time_str()
+        system_content = f"현재 시각: {current_time}\n\n{instruction_augment}"
+        messages = [SystemMessage(content=system_content)] + messages
+
     # 도구 호출 횟수 체크
     tool_call_count = sum(1 for m in messages if hasattr(m, 'tool_calls') and m.tool_calls)
     if tool_call_count > 2:
@@ -45,23 +49,26 @@ def augment_agent(state: InfoBuildAgentState):
 
     log_agent_step("KnowledgeAugmentor", "구글 검색 및 DB 추가 시작")
     response = llm_augment.invoke(messages)
-    
+
     # 여러 개의 툴 호출이 들어올 경우 첫 번째만 수행하도록 제한
     if response.tool_calls and len(response.tool_calls) > 1:
-        print(f"\n[KnowledgeAugmentor] Multiple tool calls detected. Keeping only the first one: {response.tool_calls[0]['name']}")
+        print(
+            f"\n[KnowledgeAugmentor] Multiple tool calls detected. Keeping only the first one: {response.tool_calls[0]['name']}")
         response.tool_calls = response.tool_calls[:1]
 
     log_agent_step("KnowledgeAugmentor", "응답 수신", {"content": response.content, "tool_calls": response.tool_calls})
     return {"messages": [response]}
 
+
 def should_continue(state: InfoBuildAgentState):
     messages = state["messages"]
     last_message = messages[-1]
-    
+
     if last_message.tool_calls:
         log_agent_step("KnowledgeAugmentor", "도구 사용", {"tools": [tc['name'] for tc in last_message.tool_calls]})
         return "tools"
     return END
+
 
 workflow = StateGraph(InfoBuildAgentState)
 workflow.add_node("augment_agent", augment_agent)

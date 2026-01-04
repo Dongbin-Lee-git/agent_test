@@ -11,10 +11,10 @@ from app.service.agents.info_extractor_service import InfoExtractorService
 from app.service.agents.knowledge_augmentor_service import KnowledgeAugmentorService
 from app.service.agents.answer_gen_service import AnswerGenService
 from app.agents import (
-    super_graph, 
-    info_extract_graph, 
+    super_graph,
+    info_extract_graph,
     knowledge_augment_graph,
-    answer_gen_graph, 
+    answer_gen_graph,
 )
 
 load_dotenv()
@@ -22,11 +22,11 @@ load_dotenv()
 
 class AgentService:
     def __init__(
-        self, 
-        vector_service: VectorService,
-        info_extractor_service: InfoExtractorService,
-        knowledge_augmentor_service: KnowledgeAugmentorService,
-        answer_gen_service: AnswerGenService
+            self,
+            vector_service: VectorService,
+            info_extractor_service: InfoExtractorService,
+            knowledge_augmentor_service: KnowledgeAugmentorService,
+            answer_gen_service: AnswerGenService
     ):
         api_key = os.getenv("UPSTAGE_API_KEY")
         if not api_key:
@@ -34,7 +34,7 @@ class AgentService:
 
         self.client = OpenAI(api_key=api_key, base_url="https://api.upstage.ai/v1")
         self.vector_service = vector_service
-        
+
         # Injected sub-services
         self.info_extractor_service = info_extractor_service
         self.knowledge_augmentor_service = knowledge_augmentor_service
@@ -47,11 +47,12 @@ class AgentService:
             "answerer": answer_gen_graph
         }
 
-
     def add_knowledge(
-        self, documents: List[str], metadatas: List[Dict[str, Any]] = None
+            self, documents: List[str], metadatas: List[Dict[str, Any]] = None
     ) -> Dict[str, str]:
         try:
+            # documents와 metadatas를 사용하여 MedicalQA 리스트를 생성하는 방식으로 확장 가능하지만
+            # 현재는 단순 전달 구조 유지. 필요시 엔티티 변환 로직 추가 가능.
             self.vector_service.add_documents(documents, metadatas)
             return {
                 "status": "success",
@@ -67,7 +68,7 @@ class AgentService:
         graph = self.graphs.get(agent_name)
         if not graph:
             raise AgentNotFoundException(agent_name)
-        
+
         # Ensure state is fresh for each run if it's the main graph
         if agent_name == "super":
             # answer_logs will be handled by LangGraph's checkpointer if session_id is provided.
@@ -92,7 +93,7 @@ class AgentService:
         }
         if session_id:
             config["configurable"]["thread_id"] = session_id
-            
+
         result = graph.invoke(inputs, config=config)
         return result
 
@@ -100,7 +101,7 @@ class AgentService:
         graph = self.graphs.get(agent_name)
         if not graph:
             raise AgentNotFoundException(agent_name)
-        
+
         if agent_name == "super":
             # answer_logs will be handled by LangGraph's checkpointer if session_id is provided.
             # We only provide the new user query.
@@ -124,9 +125,8 @@ class AgentService:
         }
         if session_id:
             config["configurable"]["thread_id"] = session_id
-        
-        # graph.astream uses the async streaming interface of LangGraph
-        # subgraphs=True allows capturing events from internal nodes of subgraphs
-        async for event in graph.astream(inputs, config=config, stream_mode="updates", subgraphs=True):
-            yield event
 
+        # graph.astream_events uses the async event streaming interface of LangGraph
+        # This allows capturing token-level events from LLMs within the graph
+        async for event in graph.astream_events(inputs, config=config, version="v2"):
+            yield event

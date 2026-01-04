@@ -2,6 +2,7 @@ from typing import List
 
 from app.core.llm import get_upstage_embeddings
 
+
 class EmbeddingService:
     def __init__(self):
         self._embeddings = get_upstage_embeddings()

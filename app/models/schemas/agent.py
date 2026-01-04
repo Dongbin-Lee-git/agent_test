@@ -1,39 +1,52 @@
-from typing import List, Dict, Any, Optional
-from pydantic import BaseModel
+from typing import Dict, Any, Optional
+from pydantic import BaseModel, Field
 
 
-class AddKnowledgeRequest(BaseModel):
-    documents: List[str]
-    metadatas: Optional[List[Dict[str, Any]]] = None
+class BaseSchema(BaseModel):
+    """기본 스키마 클래스"""
 
-class KnowledgeResponse(BaseModel):
-    status: str
-    message: str
+    class Config:
+        from_attributes = True
 
-class StatsResponse(BaseModel):
-    name: str
-    count: int
-    metadata: Optional[Dict[str, Any]] = None
 
-class ChatRequest(BaseModel):
-    query: str
-    session_id: Optional[str] = None
+class ChatRequest(BaseSchema):
+    """채팅 요청 스키마"""
+    query: str = Field(..., description="사용자 질문")
+    session_id: Optional[str] = Field(None, description="세션 ID")
 
-class Message(BaseModel):
-    role: str
-    content: str
-    tool_calls: Optional[List[Dict[str, Any]]] = None
 
-class ChatResponse(BaseModel):
-    user_query: str
-    process_status: Optional[str] = None
-    loop_count: Optional[int] = None
-    build_logs: Optional[List[Message]] = None
-    augment_logs: Optional[List[Message]] = None
-    extract_logs: Optional[List[Message]] = None
-    answer_logs: Optional[List[Message]] = None
-    eval_logs: Optional[List[Message]] = None
+class ChatResponse(BaseSchema):
+    """채팅 응답 스키마"""
+    answer: str = Field(..., description="에이전트 답변")
+    user_query: Optional[str] = Field(None, description="사용자 질문")
+    process_status: Optional[str] = Field(None, description="처리 상태")
+    loop_count: Optional[int] = Field(None, description="루프 횟수")
 
-class AgentRunRequest(BaseModel):
-    inputs: Dict[str, Any]
-    session_id: Optional[str] = None
+
+class AgentRunRequest(BaseSchema):
+    """에이전트 실행 요청 스키마"""
+    inputs: Dict[str, Any] = Field(..., description="에이전트 입력값")
+    session_id: Optional[str] = Field(None, description="세션 ID")
+
+
+class StreamEvent(BaseSchema):
+    """스트림 이벤트 기본 스키마"""
+    type: str = Field(..., description="이벤트 타입 (token, log, error)")
+
+
+class TokenStreamEvent(StreamEvent):
+    """토큰 스트림 이벤트 스키마"""
+    type: str = Field("token", description="이벤트 타입")
+    answer: str = Field(..., description="생성된 답변 토큰")
+
+
+class LogStreamEvent(StreamEvent):
+    """로그 스트림 이벤트 스키마"""
+    type: str = Field("log", description="이벤트 타입")
+    log: str = Field(..., description="로그 메시지")
+
+
+class ErrorStreamEvent(StreamEvent):
+    """에러 스트림 이벤트 스키마"""
+    type: str = Field("error", description="이벤트 타입")
+    error: str = Field(..., description="에러 메시지")

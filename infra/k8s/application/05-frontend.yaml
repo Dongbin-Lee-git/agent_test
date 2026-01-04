@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: medical-qa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/dongbin-lee-git/medical-qa-frontend:latest
+          ports:
+            - containerPort: 8002
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          env:
+            - name: BACKEND_URL
+              value: "http://backend:8001"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: medical-qa
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 8002
+      targetPort: 8002

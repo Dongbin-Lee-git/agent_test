@@ -21,6 +21,7 @@ class ChromaDBConfig:
         self.collection_name = os.getenv("CHROMA_COLLECTION_NAME", "upstage_embeddings")
         logger.info(f"ChromaDB Mode: {self.mode}, Path: {self.persist_path}, Host: {self.host}:{self.port}")
 
+
 class ChromaDBConnection:
     _instance: Optional["ChromaDBConnection"] = None
     _client: Optional[chromadb.ClientAPI] = None
@@ -34,7 +35,7 @@ class ChromaDBConnection:
         if self._client is None:
             config = ChromaDBConfig()
             from chromadb.config import Settings
-            
+
             if config.mode == "server":
                 logger.info(f"Connecting to ChromaDB server at {config.host}:{config.port}")
                 self._client = chromadb.HttpClient(

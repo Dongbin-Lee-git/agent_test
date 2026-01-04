@@ -6,20 +6,20 @@ from app.core.db import ChromaDBConnection
 class VectorRepository(ABC):
     @abstractmethod
     def add_documents(
-        self,
-        documents: List[str],
-        embeddings: List[List[float]],
-        metadatas: List[Dict[str, Any]] = None,
-        ids: List[str] = None,
+            self,
+            documents: List[str],
+            embeddings: List[List[float]],
+            metadatas: List[Dict[str, Any]] = None,
+            ids: List[str] = None,
     ):
         pass
 
     @abstractmethod
     def query(
-        self,
-        query_embeddings: List[List[float]],
-        n_results: int = 5,
-        include: List[str] = None,
+            self,
+            query_embeddings: List[List[float]],
+            n_results: int = 5,
+            include: List[str] = None,
     ) -> Dict[str, Any]:
         pass
 
@@ -38,11 +38,11 @@ class ChromaDBRepository(VectorRepository):
         self.collection = self._connection.get_collection(collection_name)
 
     def add_documents(
-        self,
-        documents: List[str],
-        embeddings: List[List[float]],
-        metadatas: List[Dict[str, Any]] = None,
-        ids: List[str] = None,
+            self,
+            documents: List[str],
+            embeddings: List[List[float]],
+            metadatas: List[Dict[str, Any]] = None,
+            ids: List[str] = None,
     ):
         if ids is None:
             ids = [f"doc_{i}" for i in range(len(documents))]
@@ -55,13 +55,13 @@ class ChromaDBRepository(VectorRepository):
         )
 
     def query(
-        self,
-        query_embeddings: List[List[float]],
-        n_results: int = 5,
-        include: List[str] = None,
+            self,
+            query_embeddings: List[List[float]],
+            n_results: int = 5,
+            include: List[str] = None,
     ) -> Dict[str, Any]:
         if include is None:
-            include = ["documents", "metadatas", "distances"]
+            include = ["documents", "metadatas", "distances", "ids"]
 
         return self.collection.query(
             query_embeddings=query_embeddings, n_results=n_results, include=include
@@ -73,6 +73,5 @@ class ChromaDBRepository(VectorRepository):
     def get_collection_info(self) -> Dict[str, Any]:
         return {
             "name": self.collection.name,
-            "count": self.collection.count(),
-            "metadata": self.collection.metadata,
+            "count": self.collection.count()
         }
