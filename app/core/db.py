@@ -19,7 +19,7 @@ class ChromaDBConfig:
         self.mode = os.getenv("CHROMA_MODE", "server").lower().strip('"').strip("'")
         self.host = os.getenv("CHROMA_HOST", "localhost").strip('"').strip("'")
         self.port = int(str(os.getenv("CHROMA_PORT", "8000")).strip('"').strip("'"))
-        self.persist_path = os.getenv("CHROMA_PERSIST_PATH", "./chroma_db").strip('"').strip("'")
+        self.persist_path = os.getenv("CHROMA_PERSIST_PATH", "/data").strip('"').strip("'")
         self.collection_name = os.getenv("CHROMA_COLLECTION_NAME", "medical_embedding").strip('"').strip("'")
         logger.info(f"Initialized ChromaDBConfig: mode={self.mode}, host={self.host}, port={self.port}, persist_path={self.persist_path}")
 
