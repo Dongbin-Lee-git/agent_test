@@ -11,6 +11,7 @@ from app.models.entities.medical_qa import MedicalQA
 from app.service.vector_service import VectorService
 from app.repository.vector.vector_repo import ChromaDBRepository
 from app.service.embedding_service import EmbeddingService
+from app.core.db import ChromaDBConfig
 
 # 로거 설정
 logger = logging.getLogger("seed")
@@ -20,7 +21,7 @@ class SeedManager:
     """의료 데이터 다운로드 및 벡터 DB 시딩을 담당하는 매니저 클래스"""
 
     def __init__(self):
-        self.seed_status_file = Path("/tmp/seed_status.json")
+        self.seed_status_file = Path("logs/seed_status.json")
         self.resource_dir = Path("resources")
         self.data_dir = self.resource_dir / "의료데이터"
         self.zip_path = self.resource_dir / "의료데이터.zip"
@@ -132,6 +133,11 @@ class SeedManager:
     def run(self):
         """시딩 프로세스 메인 실행 함수"""
         try:
+            # DB 설정 정보 로그 출력
+            from app.core.db import ChromaDBConfig
+            config = ChromaDBConfig()
+            logger.info(f"Starting seeding process. Mode: {config.mode}, Host: {config.host}, Port: {config.port}")
+            
             # 1. 데이터 준비 및 파일 카운팅 (먼저 수행)
             self._update_status("in_progress", 0, 0, "Checking file integrity...")
 

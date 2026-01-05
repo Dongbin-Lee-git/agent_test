@@ -23,6 +23,8 @@ spec:
               value: "TRUE"
             - name: PERSIST_DIRECTORY
               value: "/chroma/chroma"
+            - name: CHROMA_SERVER_AUTH_PROVIDER
+              value: ""
           volumeMounts:
             - name: chromadb-data
               mountPath: /chroma/chroma
