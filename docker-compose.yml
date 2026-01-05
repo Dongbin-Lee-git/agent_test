@@ -27,6 +27,7 @@ services:
     environment:
       - UPSTAGE_API_KEY=${UPSTAGE_API_KEY}
       - SERPER_API_KEY=${SERPER_API_KEY}
+      - CHROMA_MODE=server
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
       - BACKEND_URL=http://backend:8001

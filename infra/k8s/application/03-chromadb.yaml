@@ -21,6 +21,8 @@ spec:
           env:
             - name: IS_PERSISTENT
               value: "TRUE"
+            - name: PERSIST_DIRECTORY
+              value: "/chroma/chroma"
           volumeMounts:
             - name: chromadb-data
               mountPath: /chroma/chroma

@@ -4,6 +4,7 @@ metadata:
   name: app-config
   namespace: medical-qa
 data:
+  CHROMA_MODE: "server"
   CHROMA_HOST: "chromadb"
   CHROMA_PORT: "8000"
   SEED_URL: "${SEED_URL}"

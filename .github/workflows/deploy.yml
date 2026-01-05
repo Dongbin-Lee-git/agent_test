@@ -1,8 +1,8 @@
 name: Build & Version & Push Image (GHCR)
 
-#on:
-#  push:
-#    branches: [ fastapi ]
+on:
+  push:
+    branches: [ deploy ]
 
 jobs:
   build:
