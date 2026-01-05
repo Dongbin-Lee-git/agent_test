@@ -7,18 +7,20 @@ from dotenv import load_dotenv
 # Suppress all chromadb related logging before it starts
 logging.getLogger("chromadb").setLevel(logging.ERROR)
 
-load_dotenv()
+# Load environment variables only if not in a server environment
+if os.getenv("KUBERNETES_SERVICE_HOST") is None:
+    load_dotenv()
 
 logger = logging.getLogger("chroma")
 
 
 class ChromaDBConfig:
     def __init__(self):
-        self.mode = os.getenv("CHROMA_MODE", "local").lower().strip('"').strip("'")
+        self.mode = os.getenv("CHROMA_MODE", "server").lower().strip('"').strip("'")
         self.host = os.getenv("CHROMA_HOST", "localhost").strip('"').strip("'")
         self.port = int(str(os.getenv("CHROMA_PORT", "8000")).strip('"').strip("'"))
         self.persist_path = os.getenv("CHROMA_PERSIST_PATH", "./chroma_db").strip('"').strip("'")
-        self.collection_name = os.getenv("CHROMA_COLLECTION_NAME", "upstage_embeddings").strip('"').strip("'")
+        self.collection_name = os.getenv("CHROMA_COLLECTION_NAME", "medical_embedding").strip('"').strip("'")
         logger.info(f"Initialized ChromaDBConfig: mode={self.mode}, host={self.host}, port={self.port}, persist_path={self.persist_path}")
 
 
