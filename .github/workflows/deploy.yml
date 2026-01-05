@@ -44,11 +44,11 @@ jobs:
 
       - name: Set image name and repo name
         run: |
-#           전체 경로를 소문자로 변환 (이미지용)
+          # 전체 경로를 소문자로 변환 (이미지용)
           FULL_REPO_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_NAME=ghcr.io/${FULL_REPO_NAME}" >> $GITHUB_ENV
                 
-#           저장소 이름만 추출 (예: owner/my-repo -> my-repo)
+          # 저장소 이름만 추출 (예: owner/my-repo -> my-repo)
           REPO_ONLY=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}' | tr '[:upper:]' '[:lower:]')
           echo "REPO_NAME=${REPO_ONLY}" >> $GITHUB_ENV
 
