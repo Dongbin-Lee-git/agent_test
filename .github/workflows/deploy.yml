@@ -84,14 +84,18 @@ jobs:
           script: |
             set -euo pipefail
 
+            # 질문하신 것처럼 여기서 한꺼번에 정의
+            REPO_NAME="${{ env.REPO_NAME }}"
+            IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            VERSION_TAG="${{ steps.version.outputs.version_tag }}"
             cd "/home/ubuntu/deploy/${REPO_NAME}/infra/k8s/application"
 
             # Backend 업데이트
-            sed -i "s|image: .*|image: ${IMAGE_NAME}-backend:${VERSION_TAG}|g" 04-backend.yaml
+            sed -i "s|image: ${IMAGE_NAME}-backend:.*|image: ${IMAGE_NAME}-backend:${VERSION_TAG}|g" 04-backend.yaml
             sed -i "s|value: \".*\"|value: \"${VERSION_TAG}\"|g" 04-backend.yaml
 
             # Frontend 업데이트
-            sed -i "s|image: .*|image: ${IMAGE_NAME}-frontend:${VERSION_TAG}|g" 05-frontend.yaml
+            sed -i "s|image: ${IMAGE_NAME}-frontend:.*|image: ${IMAGE_NAME}-frontend:${VERSION_TAG}|g" 05-frontend.yaml
 
             kubectl apply -f 04-backend.yaml
             kubectl apply -f 05-frontend.yaml
