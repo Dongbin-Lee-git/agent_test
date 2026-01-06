@@ -136,7 +136,7 @@ def should_continue(state: InfoExtractAgentState):
 
     # Tool call limit
     tool_call_count = sum(1 for m in messages if hasattr(m, 'tool_calls') and m.tool_calls)
-    if tool_call_count > 2:
+    if tool_call_count > 3:
         log_agent_step("MedicalInfoExtractor", "도구 호출 횟수 초과로 강제 종료")
         return "verify"
 

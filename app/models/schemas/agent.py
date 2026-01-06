@@ -23,12 +23,6 @@ class ChatResponse(BaseSchema):
     loop_count: Optional[int] = Field(None, description="루프 횟수")
 
 
-class AgentRunRequest(BaseSchema):
-    """에이전트 실행 요청 스키마"""
-    inputs: Dict[str, Any] = Field(..., description="에이전트 입력값")
-    session_id: Optional[str] = Field(None, description="세션 ID")
-
-
 class StreamEvent(BaseSchema):
     """스트림 이벤트 기본 스키마"""
     type: str = Field(..., description="이벤트 타입 (token, log, error)")

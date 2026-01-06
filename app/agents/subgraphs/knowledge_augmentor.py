@@ -43,18 +43,12 @@ def augment_agent(state: InfoBuildAgentState):
 
     # 도구 호출 횟수 체크
     tool_call_count = sum(1 for m in messages if hasattr(m, 'tool_calls') and m.tool_calls)
-    if tool_call_count > 2:
+    if tool_call_count > 3:
         log_agent_step("KnowledgeAugmentor", "최대 도구 호출 횟수 도달 -> 강제 종료")
         return {"messages": [AIMessage(content='{"status": "success", "info_added": "Maximum tool calls reached"}')]}
 
     log_agent_step("KnowledgeAugmentor", "구글 검색 및 DB 추가 시작")
     response = llm_augment.invoke(messages)
-
-    # 여러 개의 툴 호출이 들어올 경우 첫 번째만 수행하도록 제한
-    if response.tool_calls and len(response.tool_calls) > 1:
-        print(
-            f"\n[KnowledgeAugmentor] Multiple tool calls detected. Keeping only the first one: {response.tool_calls[0]['name']}")
-        response.tool_calls = response.tool_calls[:1]
 
     log_agent_step("KnowledgeAugmentor", "응답 수신", {"content": response.content, "tool_calls": response.tool_calls})
     return {"messages": [response]}

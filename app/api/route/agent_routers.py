@@ -8,7 +8,6 @@ from app.models import (
     StatsResponse,
     ChatRequest,
     ChatResponse,
-    AgentRunRequest,
     TokenStreamEvent,
     LogStreamEvent,
     ErrorStreamEvent
@@ -32,7 +31,7 @@ async def chat(
 ):
     try:
         inputs = {"user_query": request.query, "process_status": "start"}
-        result = agent_service.run_agent("super", inputs, session_id=request.session_id)
+        result = agent_service.run_agent(inputs, session_id=request.session_id)
 
         # Serialize result for response
         serializable_result = {
@@ -69,7 +68,7 @@ async def chat_stream(
         try:
             inputs = {"user_query": request.query, "process_status": "start"}
             current_node = ""
-            async for event in agent_service.stream_agent("super", inputs, session_id=request.session_id):
+            async for event in agent_service.stream_agent(inputs, session_id=request.session_id):
                 kind = event.get("event")
                 name = event.get("name", "")
 
@@ -162,33 +161,3 @@ async def delete_knowledge(
 async def health_check():
     return {"status": "healthy", "message": "Agent service is running"}
 
-
-@router.post("/{name}")
-async def run_individual_agent(
-        name: str,
-        request: AgentRunRequest,
-        agent_service: AgentService = Depends(get_agent_service),
-):
-    try:
-        result = agent_service.run_agent(name, request.inputs, session_id=request.session_id)
-
-        # Simple serialization
-        serializable_result = {}
-        for k, v in result.items():
-            if isinstance(v, list):
-                serializable_result[k] = []
-                for m in v:
-                    msg_dict = {"role": getattr(m, 'type', 'unknown'), "content": getattr(m, 'content', str(m))}
-                    if hasattr(m, 'tool_calls') and m.tool_calls:
-                        msg_dict["tool_calls"] = m.tool_calls
-                    serializable_result[k].append(msg_dict)
-            else:
-                serializable_result[k] = v
-
-        return serializable_result
-    except BaseAppException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Agent '{name}' execution failed: {str(e)}"
-        )

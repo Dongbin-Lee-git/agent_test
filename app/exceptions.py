@@ -23,17 +23,6 @@ class AgentException(BaseAppException):
         super().__init__(message, status_code=500, details=details)
 
 
-class AgentNotFoundException(AgentException):
-    """요청한 에이전트를 찾을 수 없을 때 발생"""
-
-    def __init__(self, agent_name: str):
-        super().__init__(
-            message=f"Agent '{agent_name}' not found",
-            details={"agent_name": agent_name}
-        )
-        self.status_code = 404
-
-
 class KnowledgeBaseException(BaseAppException):
     """지식 베이스(벡터 DB) 조작 관련 예외"""
 
