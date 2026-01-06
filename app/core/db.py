@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 # Suppress all chromadb related logging before it starts
 logging.getLogger("chromadb").setLevel(logging.ERROR)
 
-# Load environment variables only if not in a server environment
+# 배포 환경(Kubernetes)에서는 ConfigMap/Secret으로 환경변수가 자동 주입되므로 .env 로드를 건너뜁니다.
+# 로컬 개발 환경에서만 .env 파일을 읽어오도록 처리합니다.
 if os.getenv("KUBERNETES_SERVICE_HOST") is None:
     load_dotenv()
 
