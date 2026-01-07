@@ -11,7 +11,6 @@ from app.models.entities.medical_qa import MedicalQA
 from app.service.vector_service import VectorService
 from app.repository.vector.vector_repo import ChromaDBRepository
 from app.service.embedding_service import EmbeddingService
-from app.core.db import ChromaDBConfig
 
 # 로거 설정
 logger = logging.getLogger("seed")

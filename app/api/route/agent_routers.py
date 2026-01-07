@@ -12,7 +12,7 @@ from app.models import (
     LogStreamEvent,
     ErrorStreamEvent
 )
-from app.exceptions import BaseAppException
+from app.exceptions import AgentException, KnowledgeBaseException
 from app.deps import get_agent_service
 from app.service.agent_service import AgentService
 from app.core.seed import get_seed_status
@@ -52,12 +52,10 @@ async def chat(
                 serializable_result[k] = result[k]
 
         return serializable_result
-    except BaseAppException as e:
+    except (AgentException, KnowledgeBaseException) as e:
         raise e
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Chat processing failed: {str(e)}"
-        )
+        raise AgentException(f"Chat processing failed: {str(e)}")
 
 
 @router.post("/chat/stream")
@@ -131,10 +129,10 @@ async def add_knowledge(
             documents=request.documents, metadatas=request.metadatas
         )
         return KnowledgeResponse(**result)
+    except (AgentException, KnowledgeBaseException) as e:
+        raise e
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Adding knowledge failed: {str(e)}"
-        )
+        raise KnowledgeBaseException(f"Adding knowledge failed: {str(e)}")
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -142,8 +140,10 @@ async def get_knowledge_stats(agent_service: AgentService = Depends(get_agent_se
     try:
         stats = agent_service.get_knowledge_stats()
         return StatsResponse(**stats)
+    except (AgentException, KnowledgeBaseException) as e:
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+        raise KnowledgeBaseException(f"Failed to get stats: {str(e)}")
 
 
 @router.delete("/knowledge/{doc_id}")
@@ -153,8 +153,10 @@ async def delete_knowledge(
     try:
         agent_service.vector_service.delete_document(doc_id)
         return {"status": "success", "message": f"Document {doc_id} deleted"}
+    except (AgentException, KnowledgeBaseException) as e:
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Deletion failed: {str(e)}")
+        raise KnowledgeBaseException(f"Deletion failed: {str(e)}")
 
 
 @router.get("/health")

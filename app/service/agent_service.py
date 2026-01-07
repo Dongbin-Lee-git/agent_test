@@ -5,6 +5,7 @@ from openai import OpenAI  # openai==1.52.2
 from langchain_core.messages import HumanMessage
 
 from dotenv import load_dotenv
+from app.exceptions import AgentException, ValidationException
 from app.service.vector_service import VectorService
 from app.service.agents.info_extractor_service import InfoExtractorService
 from app.service.agents.knowledge_augmentor_service import KnowledgeAugmentorService
@@ -27,7 +28,7 @@ class AgentService:
     ):
         api_key = os.getenv("UPSTAGE_API_KEY")
         if not api_key:
-            raise ValueError("UPSTAGE_API_KEY environment variable is required")
+            raise ValidationException("UPSTAGE_API_KEY environment variable is required")
 
         self.client = OpenAI(api_key=api_key, base_url="https://api.upstage.ai/v1")
         self.vector_service = vector_service
@@ -40,16 +41,13 @@ class AgentService:
     def add_knowledge(
             self, documents: List[str], metadatas: List[Dict[str, Any]] = None
     ) -> Dict[str, str]:
-        try:
-            # documents와 metadatas를 사용하여 MedicalQA 리스트를 생성하는 방식으로 확장 가능하지만
-            # 현재는 단순 전달 구조 유지. 필요시 엔티티 변환 로직 추가 가능.
-            self.vector_service.add_documents(documents, metadatas)
-            return {
-                "status": "success",
-                "message": f"Added {len(documents)} documents to knowledge base",
-            }
-        except Exception as e:
-            return {"status": "error", "message": f"Failed to add documents: {str(e)}"}
+        # documents와 metadatas를 사용하여 MedicalQA 리스트를 생성하는 방식으로 확장 가능하지만
+        # 현재는 단순 전달 구조 유지. 필요시 엔티티 변환 로직 추가 가능.
+        self.vector_service.add_documents(documents, metadatas)
+        return {
+            "status": "success",
+            "message": f"Added {len(documents)} documents to knowledge base",
+        }
 
     def get_knowledge_stats(self) -> Dict[str, Any]:
         return self.vector_service.get_collection_info()
@@ -79,8 +77,11 @@ class AgentService:
         if session_id:
             config["configurable"]["thread_id"] = session_id
 
-        result = super_graph.invoke(inputs, config=config)
-        return result
+        try:
+            result = super_graph.invoke(inputs, config=config)
+            return result
+        except Exception as e:
+            raise AgentException(f"Agent execution failed: {str(e)}")
 
     async def stream_agent(self, inputs: Dict[str, Any], session_id: str = None):
         # answer_logs will be handled by LangGraph's checkpointer if session_id is provided.

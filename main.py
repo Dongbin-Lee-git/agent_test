@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 from app.api.route.agent_routers import router as agent_router
 from app.core.seed import seed_data_if_empty
-from app.exceptions import BaseAppException
+from app.exceptions import AgentException, KnowledgeBaseException, ValidationException
 
 
 @asynccontextmanager
@@ -23,12 +23,36 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.exception_handler(BaseAppException)
-async def base_app_exception_handler(request: Request, exc: BaseAppException):
+@app.exception_handler(AgentException)
+async def agent_exception_handler(request: Request, exc: AgentException):
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "error": exc.__class__.__name__,
+            "error": "AgentException",
+            "message": exc.message,
+            "details": exc.details
+        },
+    )
+
+
+@app.exception_handler(KnowledgeBaseException)
+async def knowledge_base_exception_handler(request: Request, exc: KnowledgeBaseException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": "KnowledgeBaseException",
+            "message": exc.message,
+            "details": exc.details
+        },
+    )
+
+
+@app.exception_handler(ValidationException)
+async def validation_exception_handler(request: Request, exc: ValidationException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": "ValidationException",
             "message": exc.message,
             "details": exc.details
         },
@@ -38,7 +62,12 @@ async def base_app_exception_handler(request: Request, exc: BaseAppException):
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
     return JSONResponse(
-        status_code=400, content={"error": "Bad Request", "message": str(exc)}
+        status_code=400,
+        content={
+            "error": "ValueError",
+            "message": str(exc),
+            "details": {}
+        },
     )
 
 
@@ -46,7 +75,11 @@ async def value_error_handler(request: Request, exc: ValueError):
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "HTTP Exception", "message": exc.detail},
+        content={
+            "error": "HTTPException",
+            "message": exc.detail,
+            "details": {}
+        },
     )
 
 
@@ -54,7 +87,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={"error": "Internal Server Error", "message": "Something went wrong"},
+        content={
+            "error": "InternalServerError",
+            "message": "An unexpected error occurred",
+            "details": {"type": exc.__class__.__name__, "info": str(exc)}
+        },
     )
 
 

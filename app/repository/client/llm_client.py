@@ -1,6 +1,7 @@
 import os
 from langchain_upstage import ChatUpstage, UpstageEmbeddings
 from dotenv import load_dotenv
+from app.exceptions import ValidationException
 from app.repository.client.base import BaseLLMClient
 
 # 배포 환경(Kubernetes)에서는 ConfigMap/Secret으로 환경변수가 자동 주입되므로 .env 로드를 건너뜁니다.
@@ -12,6 +13,8 @@ if os.getenv("KUBERNETES_SERVICE_HOST") is None:
 class UpstageClient(BaseLLMClient):
     def __init__(self):
         self.api_key = os.getenv("UPSTAGE_API_KEY")
+        if not self.api_key:
+            raise ValidationException("UPSTAGE_API_KEY environment variable is required")
         self.chat_model_name = os.getenv("UPSTAGE_CHAT_MODEL", "solar-pro2")
         self.embedding_model_name = os.getenv("UPSTAGE_EMBEDDING_MODEL", "solar-embedding-1-large")
         self._chat_instance = None

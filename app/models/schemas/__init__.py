@@ -5,9 +5,7 @@ from .agent import (
     StreamEvent,
     TokenStreamEvent,
     LogStreamEvent,
-    ErrorStreamEvent
-)
-from .knowledge import (
+    ErrorStreamEvent,
     AddKnowledgeRequest,
     KnowledgeResponse,
     StatsResponse
