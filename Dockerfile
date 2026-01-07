@@ -14,7 +14,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 의존성 파일만 먼저 복사
-#COPY pyproject.toml uv.lock ./
 COPY pyproject.toml ./
 
 # .venv에 의존성 설치 (dev 의존성 제외)
